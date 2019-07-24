@@ -167,7 +167,7 @@ void loop()
       nightmode();
     }
     //update the display only if time has changed
-    else if (now() != prevDisplay) { 
+    else if (now() != prevDisplay) {
       prevDisplay = now();
       digitalClockDisplay();
     }
@@ -242,11 +242,12 @@ byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 time_t getNtpTime()
 {
-  IPAddress ntpServerIP; // NTP server's ip address
-
-  while (Udp.parsePacket() > 0) ; // discard any previously received packets
+  // NTP server's ip address
+  IPAddress ntpServerIP;
+  // Discard any previously received packets
+  while (Udp.parsePacket() > 0) ;
   Serial.println("Transmit NTP Request");
-  // get a random server from the pool
+  // Get a random server from the pool
   WiFi.hostByName(ntpServerName, ntpServerIP);
   Serial.print(ntpServerName);
   Serial.print(": ");
@@ -259,7 +260,7 @@ time_t getNtpTime()
       Serial.println("Received NTP Response");
       Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
       unsigned long secsSince1900;
-      // convert four bytes starting at location 40 to a long integer
+      // Convert four bytes starting at location 40 to a long integer
       secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
       secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
@@ -268,7 +269,8 @@ time_t getNtpTime()
     }
   }
   Serial.println("No NTP Response :-(");
-  return 0; // return 0 if unable to get the time
+  // return 0 if unable to get the time
+  return 0;
 }
 
 // send an NTP request to the time server at the given address
@@ -321,7 +323,7 @@ void checkOWM() {
         unsigned long sunsetul = owm_data["sys"][SUNSET];
         int code = owm_data["weather"][0]["id"];
         int weather_state = codeToState(code);
-        // Convert sunrise and sunset times from epoch time to 4 hours and minutes        
+        // Convert sunrise and sunset times from epoch time to 4 hours and minutes
         sprintf(sunrise, "%02d%02d", hour(sunriseul), minute(sunriseul));
         sprintf(sunset, "%02d%02d", hour(sunsetul), minute(sunsetul));
         // Set Lixie colour based on weather code
