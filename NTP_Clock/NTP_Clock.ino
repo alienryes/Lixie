@@ -87,7 +87,7 @@ int red = random(50, 255);                                // Random red value be
 int green = random(50, 255);                              // Random green value between 50 and 255
 int blue = random(50, 255);                               // Random blue value between 50 and 255
 byte TIME_COLOUR_RGB[3] = {red, green, blue};             // Set colour as a base to start with
-const int TIME_OFFSET = +1;                               // British Summer Time
+unsigned long offset;                                     // Time offset from UTC in seconds
 const int NIGHT_ON = 23;                                  // Night mode start hour
 const int NIGHT_OFF = 7;                                  // Night mode end hour
 char sunrise[16];
@@ -95,11 +95,12 @@ char sunset[16];
 
 String OWM_API_KEY = "4b200143e34e1bd084c42bab4010ff0c";  // Open Weather Map API Key
 String OWM_CITY_ID = "2653974";                           // Open Weather Map CityID
-String TEMPERATURE   = "temp";                            // Temperature
-String HUMIDITY = "humidity";                             // Humidity
-String SUNRISE = "sunrise";                               // Sunrise time
-String SUNSET = "sunset";                                 // Sunset time
-String OWM_UNITS   = "metric";                            // can be "imperial", "metric", or "kelvin"
+String TEMPERATURE = "temp";                              // Open Weather Map API Temperature
+String HUMIDITY = "humidity";                             // Open Weather Map API Humidity
+String SUNRISE = "sunrise";                               // Open Weather Map API Sunrise time
+String SUNSET = "sunset";                                 // Open Weather Map API Sunset time
+String OWM_UNITS = "metric";                              // Open Weather Map API units can be "imperial", "metric", or "kelvin"
+String TIMEZONE = "timezone";                             // Open Weather Map API Timezone
 
 byte state_colors[9][3] = {
   {127, 127, 255}, // 0 Thunderstorm Very Pale Blue
@@ -123,30 +124,27 @@ unsigned int localPort = 8888;  // local port to listen for UDP packets
 time_t getNtpTime();
 void digitalClockDisplay();
 void sendNTPpacket(IPAddress &address);
-//lix.max_power(5,400);
 
 void setup()
 {
   lix.begin(); // Initialize LEDs
   Serial.begin(115200);
   WiFiMulti.addAP(WIFI_SSID, WIFI_PASS); // Your WIFI credentials
-
   // This sets all lights to yellow while we're connecting to WIFI
   while ((WiFiMulti.run() != WL_CONNECTED)) {
     lix.color(255, 255, 0);
     lix.write(8888);
     delay(100);
   }
-
   // Green on connection success
   lix.color(0, 255, 0);
   lix.write(9999);
   delay(500);
-
   // Reset colors to default
   lix.color(255, 255, 255);
   lix.clear();
-
+  // Get UTC Offset
+  checkTimeZone();
   Serial.print("IP assigned by DHCP is ");
   Serial.println(WiFi.localIP());
   Serial.println("Starting UDP");
@@ -219,7 +217,11 @@ void digitalClockDisplay()
   TIME_COLOUR_RGB [1] = green;
   TIME_COLOUR_RGB [2] = blue;
   lix.color(TIME_COLOUR_RGB[0], TIME_COLOUR_RGB[1], TIME_COLOUR_RGB[2]);
-  if ( second() < 30 || second() > 35 ) {
+  if (second() >= 51 && second() <= 59) {
+    lix.color(255, 255, 0);
+    lix.write(sum);
+  }
+  else if ( second() < 30 || second() > 35 ) {
     lix.write(sum);
   }
   else if (second() >= 30 && second() <= 35) {
@@ -229,14 +231,13 @@ void digitalClockDisplay()
 }
 
 void nightmode()
-// Put nixies to sleep during night mode
+// Power down nixies during night mode
 {
   lix.color(0, 0, 0);
   lix.clear();
 }
 
 /*-------- NTP code ----------*/
-
 const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
@@ -265,7 +266,8 @@ time_t getNtpTime()
       secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
       secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
       secsSince1900 |= (unsigned long)packetBuffer[43];
-      return secsSince1900 - 2208988800UL + TIME_OFFSET * SECS_PER_HOUR;
+      int time_offset = offset / 3600;
+      return secsSince1900 - 2208988800UL + time_offset * SECS_PER_HOUR;
     }
   }
   Serial.println("No NTP Response :-(");
@@ -296,8 +298,7 @@ void sendNTPpacket(IPAddress &address)
   Udp.endPacket();
 }
 
-// Weather code
-
+/*-------- Weather code ----------*/
 void checkOWM() {
   // Set up JSON Parser
   StaticJsonDocument<1200> owm_data;
@@ -321,6 +322,8 @@ void checkOWM() {
         int humfield = owm_data["main"][HUMIDITY];
         unsigned long sunriseul = owm_data["sys"][SUNRISE];
         unsigned long sunsetul = owm_data["sys"][SUNSET];
+        sunriseul += offset;
+        sunsetul += offset;
         int code = owm_data["weather"][0]["id"];
         int weather_state = codeToState(code);
         // Convert sunrise and sunset times from epoch time to 4 hours and minutes
@@ -350,7 +353,32 @@ void checkOWM() {
   }
 }
 
-
+/*-------- Get UTC Offset ----------*/
+void checkTimeZone() {
+  // Set up JSON Parser
+  StaticJsonDocument<1200> owm_data;
+  // Wait for WiFi connection
+  if ((WiFiMulti.run() == WL_CONNECTED)) {
+    HTTPClient http;
+    http.begin("http://api.openweathermap.org/data/2.5/weather?id=" + OWM_CITY_ID + "&appid=" + OWM_API_KEY + "&units=" + OWM_UNITS);
+    int httpCode = http.GET();
+    if (httpCode > 0) {
+      if (httpCode == HTTP_CODE_OK) {
+        String payload = http.getString();
+        // Parse JSON
+        DeserializationError error = deserializeJson(owm_data, payload);
+        if (error) {
+          Serial.print(F("deserializeJson() failed with code "));
+          Serial.println(error.c_str());
+          return;
+        }
+        // Get temp, humidity, weather state, sunrise and sunset from parsed JSON
+        offset = owm_data[TIMEZONE];
+      }
+    }
+    http.end();
+  }
+}
 
 byte codeToState(uint16_t code) {
   byte state = 0;
