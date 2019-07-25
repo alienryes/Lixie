@@ -192,11 +192,15 @@ void digitalClockDisplay()
   else if ( second() >= 51 && second() <= 53 ) {
     unsigned int srout = atoi(sunrise);
     sum += srout;
+    lix.color(255, 255, 0);
+    lix.write(sum);
   }
   // Put sunset time on 4 digits
   else if ( second() >= 54 && second() <= 56 ) {
     unsigned int ssout = atoi(sunset);
     sum += ssout;
+    lix.color(255, 165, 0);
+    lix.write(sum);
   }
   else if ( second() >= 57 && second() <= 59 ) {
     // Put the day on 2 digits
@@ -206,6 +210,8 @@ void digitalClockDisplay()
     // Put the year on 2 digits
     sum += ((year() / 10) % 10) * 10;
     sum += year() % 10;
+    lix.color(0, 0, 255);
+    lix.write(sum);
   }
   // On the hour set random colour between 50 and 255 for RGB
   if ( minute() == 0 && second() == 0 ) {
@@ -218,8 +224,8 @@ void digitalClockDisplay()
   TIME_COLOUR_RGB [2] = blue;
   lix.color(TIME_COLOUR_RGB[0], TIME_COLOUR_RGB[1], TIME_COLOUR_RGB[2]);
   if (second() >= 51 && second() <= 59) {
-    lix.color(255, 255, 0);
-    lix.write(sum);
+    //lix.color(255, 255, 0);
+    //lix.write(sum);
   }
   else if ( second() < 30 || second() > 35 ) {
     lix.write(sum);
