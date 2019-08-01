@@ -70,16 +70,16 @@
 Lixie lix(DATA_PIN, NUM_LIXIES);
 
 #include <TimeLib.h>                                      // Time Library
-#include <ESP8266WiFi.h>                                  // ESP8266 WIFI Lib
+#include <SPI.h>
+#include <WiFi101.h>
 #include <WiFiUdp.h>                                      // UDP Library
-#include <ESP8266WiFiMulti.h>                             // WifiMulti Lib for connection handling
-#include <ESP8266HTTPClient.h>                            // HTTPClient for web requests
 #include <ArduinoJson.h>                                  // JSON Parser
-ESP8266WiFiMulti WiFiMulti;
+#include <ArduinoHttpClient.h>
 
 //---------------------------------------
 const char* WIFI_SSID = "BTWholeHome-WJQ";                //  your network SSID (name)
 const char* WIFI_PASS = "cqHeC6WCJxFJ";                   //  your network password
+int status = WL_IDLE_STATUS;                              //  the WiFi radio's status
 
 const bool HOUR_12 = false;                               // 12/24-hour format
 const bool SIX_DIGIT = true;                              // True if 6-digit clock with seconds
@@ -115,11 +115,17 @@ byte state_colors[9][3] = {
 };
 //---------------------------------------
 
+WiFiClient wifi;
+const char serverAddress[] = "api.openweathermap.org";
+int port = 80;
+HttpClient client = HttpClient(wifi, serverAddress, port);
+
 // NTP Servers:
 static const char ntpServerName[] = "uk.pool.ntp.org";
+IPAddress ntpServerIP (145, 239, 118, 233);
 
 WiFiUDP Udp;
-unsigned int localPort = 8888;  // local port to listen for UDP packets
+unsigned int localPort = 2390;  // local port to listen for UDP packets
 
 time_t getNtpTime();
 void digitalClockDisplay();
@@ -128,15 +134,18 @@ void sendNTPpacket(IPAddress &address);
 void setup()
 {
   lix.begin(); // Initialize LEDs
-  Serial.begin(115200);
-  WiFiMulti.addAP(WIFI_SSID, WIFI_PASS); // Your WIFI credentials
+  Serial.begin(9600);
   // This sets all lights to yellow while we're connecting to WIFI
-  while ((WiFiMulti.run() != WL_CONNECTED)) {
+  while ((status != WL_CONNECTED)) {
     lix.color(255, 255, 0);
     lix.write(8888);
+    Serial.print("Attempting to connect to SSID: ");
+    Serial.println(WIFI_SSID);
+    status = WiFi.begin(WIFI_SSID, WIFI_PASS);
     delay(100);
   }
   // Green on connection success
+  Serial.println("You're connected to the network");  
   lix.color(0, 255, 0);
   lix.write(9999);
   delay(500);
@@ -144,13 +153,8 @@ void setup()
   lix.color(255, 255, 255);
   lix.clear();
   // Get UTC Offset
-  checkTimeZone();
-  Serial.print("IP assigned by DHCP is ");
-  Serial.println(WiFi.localIP());
+  //checkTimeZone();
   Serial.println("Starting UDP");
-  Udp.begin(localPort);
-  Serial.print("Local port: ");
-  Serial.println(Udp.localPort());
   Serial.println("Waiting for sync");
   setSyncProvider(getNtpTime);
   setSyncInterval(3600);
@@ -248,33 +252,23 @@ const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
 byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 time_t getNtpTime()
-{
-  // NTP server's ip address
-  IPAddress ntpServerIP;
-  // Discard any previously received packets
+{  
   while (Udp.parsePacket() > 0) ;
-  Serial.println("Transmit NTP Request");
-  // Get a random server from the pool
-  WiFi.hostByName(ntpServerName, ntpServerIP);
-  Serial.print(ntpServerName);
-  Serial.print(": ");
   Serial.println(ntpServerIP);
-  sendNTPpacket(ntpServerIP);
-  uint32_t beginWait = millis();
-  while (millis() - beginWait < 1500) {
-    int size = Udp.parsePacket();
-    if (size >= NTP_PACKET_SIZE) {
-      Serial.println("Received NTP Response");
-      Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
-      unsigned long secsSince1900;
-      // Convert four bytes starting at location 40 to a long integer
-      secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
-      secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-      secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-      secsSince1900 |= (unsigned long)packetBuffer[43];
-      int time_offset = offset / 3600;
-      return secsSince1900 - 2208988800UL + time_offset * SECS_PER_HOUR;
-    }
+  sendNTPpacket(ntpServerIP); // send an NTP packet to a time server
+  delay(1000);
+  if ( Udp.parsePacket() ) {
+    Serial.println("packet received");
+    // We've received a packet, read the data from it
+    Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
+    unsigned long secsSince1900;
+    // Convert four bytes starting at location 40 to a long integer
+    secsSince1900 =  (unsigned long)packetBuffer[40] << 24;
+    secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
+    secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
+    secsSince1900 |= (unsigned long)packetBuffer[43];
+    int time_offset = offset / 3600;
+    return secsSince1900 - 2208988800UL + time_offset * SECS_PER_HOUR;
   }
   Serial.println("No NTP Response :-(");
   // return 0 if unable to get the time
@@ -309,53 +303,46 @@ void checkOWM() {
   // Set up JSON Parser
   StaticJsonDocument<1200> owm_data;
   // Wait for WiFi connection
-  if ((WiFiMulti.run() == WL_CONNECTED)) {
-    HTTPClient http;
-    http.begin("http://api.openweathermap.org/data/2.5/weather?id=" + OWM_CITY_ID + "&appid=" + OWM_API_KEY + "&units=" + OWM_UNITS);
-    int httpCode = http.GET();
-    if (httpCode > 0) {
-      if (httpCode == HTTP_CODE_OK) {
-        String payload = http.getString();
-        // Parse JSON
-        DeserializationError error = deserializeJson(owm_data, payload);
-        if (error) {
-          Serial.print(F("deserializeJson() failed with code "));
-          Serial.println(error.c_str());
-          return;
-        }
-        // Get temp, humidity, weather state, sunrise and sunset from parsed JSON
-        int tempfield = owm_data["main"][TEMPERATURE];
-        int humfield = owm_data["main"][HUMIDITY];
-        unsigned long sunriseul = owm_data["sys"][SUNRISE];
-        unsigned long sunsetul = owm_data["sys"][SUNSET];
-        sunriseul += offset;
-        sunsetul += offset;
-        int code = owm_data["weather"][0]["id"];
-        int weather_state = codeToState(code);
-        // Convert sunrise and sunset times from epoch time to 4 hours and minutes
-        sprintf(sunrise, "%02d%02d", hour(sunriseul), minute(sunriseul));
-        sprintf(sunset, "%02d%02d", hour(sunsetul), minute(sunsetul));
-        // Set Lixie colour based on weather code
-        lix.color(
-          state_colors[weather_state][0],
-          state_colors[weather_state][1],
-          state_colors[weather_state][2]
-        );
-        // Using 1000,000 as our base number creates zero-padded temperature
-        uint32_t temppad = 1000000;
-        // Write temperature
-        temppad += tempfield;
-        lix.write(temppad);
-        delay(2997);
-        // Using 1000,000 as our base number creates zero-padded humidity
-        uint32_t humpad = 1000000;
-        // Write humidity
-        humpad += humfield;
-        lix.write(humpad);
-        delay(2997);
-      }
+  if ((status == WL_CONNECTED)) {
+    client.get("/data/2.5/weather?id=" + OWM_CITY_ID + "&appid=" + OWM_API_KEY + "&units=" + OWM_UNITS);
+    String payload = client.responseBody();
+    // Parse JSON
+    DeserializationError error = deserializeJson(owm_data, payload);
+    if (error) {
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(error.c_str());
+      return;
     }
-    http.end();
+    // Get temp, humidity, weather state, sunrise and sunset from parsed JSON
+    int tempfield = owm_data["main"][TEMPERATURE];
+    int humfield = owm_data["main"][HUMIDITY];
+    unsigned long sunriseul = owm_data["sys"][SUNRISE];
+    unsigned long sunsetul = owm_data["sys"][SUNSET];
+    sunriseul += offset;
+    sunsetul += offset;
+    int code = owm_data["weather"][0]["id"];
+    int weather_state = codeToState(code);
+    // Convert sunrise and sunset times from epoch time to 4 hours and minutes
+    sprintf(sunrise, "%02d%02d", hour(sunriseul), minute(sunriseul));
+    sprintf(sunset, "%02d%02d", hour(sunsetul), minute(sunsetul));
+    // Set Lixie colour based on weather code
+    lix.color(
+      state_colors[weather_state][0],
+      state_colors[weather_state][1],
+      state_colors[weather_state][2]
+    );
+    // Using 1000,000 as our base number creates zero-padded temperature
+    uint32_t temppad = 1000000;
+    // Write temperature
+    temppad += tempfield;
+    lix.write(temppad);
+    delay(2997);
+    // Using 1000,000 as our base number creates zero-padded humidity
+    uint32_t humpad = 1000000;
+    // Write humidity
+    humpad += humfield;
+    lix.write(humpad);
+    delay(2997);
   }
 }
 
@@ -364,25 +351,19 @@ void checkTimeZone() {
   // Set up JSON Parser
   StaticJsonDocument<1200> owm_data;
   // Wait for WiFi connection
-  if ((WiFiMulti.run() == WL_CONNECTED)) {
-    HTTPClient http;
-    http.begin("http://api.openweathermap.org/data/2.5/weather?id=" + OWM_CITY_ID + "&appid=" + OWM_API_KEY + "&units=" + OWM_UNITS);
-    int httpCode = http.GET();
-    if (httpCode > 0) {
-      if (httpCode == HTTP_CODE_OK) {
-        String payload = http.getString();
-        // Parse JSON
-        DeserializationError error = deserializeJson(owm_data, payload);
-        if (error) {
-          Serial.print(F("deserializeJson() failed with code "));
-          Serial.println(error.c_str());
-          return;
-        }
-        // Get temp, humidity, weather state, sunrise and sunset from parsed JSON
-        offset = owm_data[TIMEZONE];
-      }
+  if ((status == WL_CONNECTED)) {
+    client.get("/data/2.5/weather?id=" + OWM_CITY_ID + "&appid=" + OWM_API_KEY + "&units=" + OWM_UNITS);
+    String payload = client.responseBody();
+    // Parse JSON
+    DeserializationError error = deserializeJson(owm_data, payload);
+    if (error) {
+      Serial.print(F("deserializeJson() failed with code "));
+      Serial.println(error.c_str());
+      return;
     }
-    http.end();
+    // Get temp, humidity, weather state, sunrise and sunset from parsed JSON
+    offset = owm_data[TIMEZONE];
+
   }
 }
 
