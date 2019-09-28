@@ -77,8 +77,8 @@ Lixie lix(DATA_PIN, NUM_LIXIES);
 #include <ArduinoHttpClient.h>
 
 //---------------------------------------
-const char* WIFI_SSID = "BTWholeHome-WJQ";                //  your network SSID (name)
-const char* WIFI_PASS = "cqHeC6WCJxFJ";                   //  your network password
+const char* WIFI_SSID = "xxxxxxxxxxx-xxx";                //  your network SSID (name)
+const char* WIFI_PASS = "xxxxxxxxxxxx";                   //  your network password
 int status = WL_IDLE_STATUS;                              //  the WiFi radio's status
 
 const bool HOUR_12 = false;                               // 12/24-hour format
@@ -93,8 +93,8 @@ const int NIGHT_OFF = 7;                                  // Night mode end hour
 char sunrise[16];
 char sunset[16];
 
-String OWM_API_KEY = "4b200143e34e1bd084c42bab4010ff0c";  // Open Weather Map API Key
-String OWM_CITY_ID = "2653974";                           // Open Weather Map CityID
+String OWM_API_KEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";  // your Open Weather Map API Key
+String OWM_CITY_ID = "xxxxxxx";                           // your Open Weather Map CityID
 String TEMPERATURE = "temp";                              // Open Weather Map API Temperature
 String HUMIDITY = "humidity";                             // Open Weather Map API Humidity
 String SUNRISE = "sunrise";                               // Open Weather Map API Sunrise time

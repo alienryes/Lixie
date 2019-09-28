@@ -32,8 +32,8 @@ Lixie lix(DATA_PIN, NUM_LIXIES);
 #include <WiFiUdp.h>
 
 //---------------------------------------
-const char* WIFI_SSID = "BTWholeHome-WJQ";  //  your network SSID (name)
-const char* WIFI_PASS = "cqHeC6WCJxFJ";  //  your network password
+const char* WIFI_SSID = "xxxxxxxx-xxx";  //  your network SSID (name)
+const char* WIFI_PASS = "xxxxxxxxxxxx";  //  your network password
 
 const bool SIX_DIGIT = false; // True if 6-digit clock with seconds
 const byte TIME_COLOR_RGB[3] = {0,255,255}; // CYAN

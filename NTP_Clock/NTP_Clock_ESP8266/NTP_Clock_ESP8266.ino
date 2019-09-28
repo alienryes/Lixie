@@ -1,8 +1,9 @@
 /* -------------------------------------------------
    NTP Clock
    using ESP8266 and Lixie Displays!
+   Neil Sayer - 28/09/2019
 
-   by Connor Nishijima - 12/28/2016
+   based on code by Connor Nishijima - 12/28/2016
    -------------------------------------------------
 
    To use your Lixie Displays / ESP8266 as an NTP
@@ -78,8 +79,8 @@ Lixie lix(DATA_PIN, NUM_LIXIES);
 ESP8266WiFiMulti WiFiMulti;
 
 //---------------------------------------
-const char* WIFI_SSID = "BTWholeHome-WJQ";                //  your network SSID (name)
-const char* WIFI_PASS = "cqHeC6WCJxFJ";                   //  your network password
+const char* WIFI_SSID = "xxxxxxxxxxx-xxx";                //  your network SSID (name)
+const char* WIFI_PASS = "xxxxxxxxxxxxxxx";                //  your network password
 
 const bool HOUR_12 = false;                               // 12/24-hour format
 const bool SIX_DIGIT = true;                              // True if 6-digit clock with seconds
@@ -93,8 +94,8 @@ const int NIGHT_OFF = 7;                                  // Night mode end hour
 char sunrise[16];
 char sunset[16];
 
-String OWM_API_KEY = "4b200143e34e1bd084c42bab4010ff0c";  // Open Weather Map API Key
-String OWM_CITY_ID = "2653974";                           // Open Weather Map CityID
+String OWM_API_KEY = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";  // your Open Weather Map API Key
+String OWM_CITY_ID = "xxxxxxxxx";                         // your Open Weather Map CityID
 String TEMPERATURE = "temp";                              // Open Weather Map API Temperature
 String HUMIDITY = "humidity";                             // Open Weather Map API Humidity
 String SUNRISE = "sunrise";                               // Open Weather Map API Sunrise time
