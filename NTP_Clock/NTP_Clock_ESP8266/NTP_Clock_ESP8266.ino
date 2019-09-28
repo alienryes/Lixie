@@ -83,9 +83,9 @@ const char* WIFI_PASS = "cqHeC6WCJxFJ";                   //  your network passw
 
 const bool HOUR_12 = false;                               // 12/24-hour format
 const bool SIX_DIGIT = true;                              // True if 6-digit clock with seconds
-int red = random(50, 255);                                // Random red value between 50 and 255
-int green = random(50, 255);                              // Random green value between 50 and 255
-int blue = random(50, 255);                               // Random blue value between 50 and 255
+int red = random(255);                                    // Random red value
+int green = random(255);                                  // Random green value
+int blue = random(255);                                   // Random blue value
 byte TIME_COLOUR_RGB[3] = {red, green, blue};             // Set colour as a base to start with
 unsigned long offset;                                     // Time offset from UTC in seconds
 const int NIGHT_ON = 23;                                  // Night mode start hour
@@ -141,7 +141,11 @@ void setup()
   lix.write(9999);
   delay(500);
   // Reset colors to default
-  lix.color(255, 255, 255);
+  //lix.color(255, 255, 255);
+  TIME_COLOUR_RGB [0] = red;
+  TIME_COLOUR_RGB [1] = green;
+  TIME_COLOUR_RGB [2] = blue;
+  lix.color(TIME_COLOUR_RGB[0], TIME_COLOUR_RGB[1], TIME_COLOUR_RGB[2]);
   lix.clear();
   // Get UTC Offset
   checkTimeZone();
@@ -215,17 +219,16 @@ void digitalClockDisplay()
   }
   // On the hour set random colour between 50 and 255 for RGB
   if ( minute() == 0 && second() == 0 ) {
-    red = random (50, 255);
-    green = random (50, 255);
-    blue = random (50, 255);
+    red = random (255);
+    green = random (255);
+    blue = random (255);
   }
   TIME_COLOUR_RGB [0] = red;
   TIME_COLOUR_RGB [1] = green;
   TIME_COLOUR_RGB [2] = blue;
   lix.color(TIME_COLOUR_RGB[0], TIME_COLOUR_RGB[1], TIME_COLOUR_RGB[2]);
-  if (second() >= 51 && second() <= 59) {
-    //lix.color(255, 255, 0);
-    //lix.write(sum);
+  
+  if (second() >= 51 && second() <= 59) {    
   }
   else if ( second() < 30 || second() > 35 ) {
     lix.write(sum);

@@ -71,7 +71,7 @@ Lixie lix(DATA_PIN, NUM_LIXIES);
 
 #include <TimeLib.h>                                      // Time Library
 #include <SPI.h>
-#include <WiFi101.h>
+#include <WiFi101.h>                                      // WIFI Shield Library
 #include <WiFiUdp.h>                                      // UDP Library
 #include <ArduinoJson.h>                                  // JSON Parser
 #include <ArduinoHttpClient.h>
@@ -121,20 +121,21 @@ int port = 80;
 HttpClient client = HttpClient(wifi, serverAddress, port);
 
 // NTP Servers:
-static const char ntpServerName[] = "uk.pool.ntp.org";
-IPAddress ntpServerIP (145, 239, 118, 233);
-
 WiFiUDP Udp;
-unsigned int localPort = 2390;  // local port to listen for UDP packets
+IPAddress ntpServerIP(129, 6, 15, 28);  // time.nist.gov NTP server
+const int NTP_PACKET_SIZE = 48;         // NTP time stamp is in the first 48 bytes of the message
+byte packetBuffer[ NTP_PACKET_SIZE];    // buffer to hold incoming and outgoing packets
+unsigned int localPort = 8888;          // local port to listen for UDP packets
 
 time_t getNtpTime();
 void digitalClockDisplay();
-void sendNTPpacket(IPAddress &address);
+//void sendNTPpacket(IPAddress &address);
 
 void setup()
 {
   lix.begin(); // Initialize LEDs
   Serial.begin(9600);
+
   // This sets all lights to yellow while we're connecting to WIFI
   while ((status != WL_CONNECTED)) {
     lix.color(255, 255, 0);
@@ -144,8 +145,12 @@ void setup()
     status = WiFi.begin(WIFI_SSID, WIFI_PASS);
     delay(100);
   }
+
   // Green on connection success
-  Serial.println("You're connected to the network");  
+  Serial.println("You're connected to the network");
+  IPAddress ip = WiFi.localIP();
+  Serial.print("IP Address: ");
+  Serial.println(ip);
   lix.color(0, 255, 0);
   lix.write(9999);
   delay(500);
@@ -154,6 +159,7 @@ void setup()
   lix.clear();
   // Get UTC Offset
   //checkTimeZone();
+  Udp.begin(localPort);
   Serial.println("Starting UDP");
   Serial.println("Waiting for sync");
   setSyncProvider(getNtpTime);
@@ -248,18 +254,15 @@ void nightmode()
 }
 
 /*-------- NTP code ----------*/
-const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
-byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
+//const int NTP_PACKET_SIZE = 48; // NTP time is in the first 48 bytes of message
+//byte packetBuffer[NTP_PACKET_SIZE]; //buffer to hold incoming & outgoing packets
 
 time_t getNtpTime()
-{  
-  while (Udp.parsePacket() > 0) ;
-  Serial.println(ntpServerIP);
-  sendNTPpacket(ntpServerIP); // send an NTP packet to a time server
+{
+  sendNTPpacket(ntpServerIP);
   delay(1000);
   if ( Udp.parsePacket() ) {
     Serial.println("packet received");
-    // We've received a packet, read the data from it
     Udp.read(packetBuffer, NTP_PACKET_SIZE);  // read packet into the buffer
     unsigned long secsSince1900;
     // Convert four bytes starting at location 40 to a long integer
@@ -275,27 +278,34 @@ time_t getNtpTime()
   return 0;
 }
 
+
 // send an NTP request to the time server at the given address
-void sendNTPpacket(IPAddress &address)
+unsigned long sendNTPpacket(IPAddress &address)
 {
+  //Serial.println("1");
   // set all bytes in the buffer to 0
   memset(packetBuffer, 0, NTP_PACKET_SIZE);
   // Initialize values needed to form NTP request
   // (see URL above for details on the packets)
+  //Serial.println("2");
   packetBuffer[0] = 0b11100011;   // LI, Version, Mode
   packetBuffer[1] = 0;     // Stratum, or type of clock
   packetBuffer[2] = 6;     // Polling Interval
   packetBuffer[3] = 0xEC;  // Peer Clock Precision
   // 8 bytes of zero for Root Delay & Root Dispersion
-  packetBuffer[12] = 49;
-  packetBuffer[13] = 0x4E;
-  packetBuffer[14] = 49;
-  packetBuffer[15] = 52;
+  packetBuffer[12]  = 49;
+  packetBuffer[13]  = 0x4E;
+  packetBuffer[14]  = 49;
+  packetBuffer[15]  = 52;
+  //Serial.println("3");
   // all NTP fields have been given values, now
   // you can send a packet requesting a timestamp:
   Udp.beginPacket(address, 123); //NTP requests are to port 123
+  //Serial.println("4");
   Udp.write(packetBuffer, NTP_PACKET_SIZE);
+  //Serial.println("5");
   Udp.endPacket();
+  //Serial.println("6");
 }
 
 /*-------- Weather code ----------*/
