@@ -79,8 +79,8 @@ Lixie lix(DATA_PIN, NUM_LIXIES);
 ESP8266WiFiMulti WiFiMulti;
 
 //---------------------------------------
-const char* WIFI_SSID = "xxxxxxxxxxx-xxx";                //  your network SSID (name)
-const char* WIFI_PASS = "xxxxxxxxxxxxxxx";                //  your network password
+const char* WIFI_SSID = "xxxxxxxxxxxxxxx";                //  your network SSID (name)
+const char* WIFI_PASS = "xxxxxxxxxxxx";                   //  your network password
 
 const bool HOUR_12 = false;                               // 12/24-hour format
 const bool SIX_DIGIT = true;                              // True if 6-digit clock with seconds
@@ -345,6 +345,11 @@ void checkOWM() {
           state_colors[weather_state][1],
           state_colors[weather_state][2]
         );
+        // If temp is less than zero then make positive and display in dark blue
+        if (tempfield < 0){
+          tempfield = -tempfield;
+          lix.color(0,0,255);
+        }
         // Using 1000,000 as our base number creates zero-padded temperature
         uint32_t temppad = 1000000;
         // Write temperature
